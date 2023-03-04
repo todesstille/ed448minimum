@@ -12,41 +12,6 @@ var curvePrimeOrder = barrettPrime{
 	lowWords: lowWords,
 }
 
-func barrettDeserialize(dst []word, serial []byte, p *barrettPrime) bool {
-	return barrettDeserializeReturnMask(dst, serial, p) != 0
-}
-
-func barrettDeserializeReturnMask(dst []word, serial []byte, p *barrettPrime) word {
-	s := p.wordsInP * wordBits / 8
-	if p.pShift != 0 {
-		s -= (wordBits - p.pShift) / 8
-	}
-
-	bytesToWords(dst, serial[:s])
-
-	carry := dword(0)
-	for i, wi := range dst {
-		carry >>= wordBits
-		carry += dword(wi)
-		if i < len(p.lowWords) {
-			carry += dword(p.lowWords[i])
-		}
-	}
-
-	if p.pShift != 0 {
-		carry >>= p.pShift
-	} else {
-		carry >>= wordBits
-	}
-
-	scarry := sdword(carry)
-	scarry = -scarry
-	scarry >>= wordBits
-	scarry >>= wordBits
-
-	return word(^scarry)
-}
-
 func barrettDeserializeAndReduce(dst []word, serial []byte, p *barrettPrime) {
 	wordLen := wordBits / 8
 	size := (len(serial) + wordLen - 1) / wordLen
@@ -148,75 +113,4 @@ func widemac(accum []word, mier []word, mand, carry word) word {
 	}
 
 	return carry
-}
-
-func barrettNegate(dst []word, p *barrettPrime) {
-	barrettReduce(dst, 0, p)
-
-	carry := sdword(0)
-	for i := 0; i < len(p.lowWords); i++ {
-		carry = carry - sdword(p.lowWords[i]) - sdword(dst[i])
-		dst[i] = word(carry)
-		carry >>= wordBits
-	}
-
-	for i := len(p.lowWords); i < int(p.wordsInP); i++ {
-		carry = carry - sdword(dst[i])
-		dst[i] = word(carry)
-		if i < int(p.wordsInP-1) {
-			carry >>= wordBits
-		}
-	}
-
-	carry = carry + sdword(word(1)<<p.pShift)
-	dst[p.wordsInP-1] = word(carry)
-}
-
-func barrettMac(dst, x, y []word, p *barrettPrime) {
-	nWords := int(p.wordsInP)
-	if nWords < len(x) {
-		nWords = len(x)
-	}
-	nWords++
-
-	if nWords < len(dst) {
-		nWords = len(dst)
-	}
-
-	tmp := make([]word, nWords)
-
-	for bpos := len(y) - 1; bpos >= 0; bpos-- {
-		for idown := nWords - 2; idown >= 0; idown-- {
-			tmp[idown+1] = tmp[idown]
-		}
-
-		tmp[0] = 0
-
-		carry := widemac(tmp, x, y[bpos], 0)
-		barrettReduce(tmp, carry, p)
-	}
-
-	cout := addPacked(tmp, dst)
-	barrettReduce(tmp, cout, p)
-
-	for i := 0; i < nWords && i < len(dst); i++ {
-		dst[i] = tmp[i]
-	}
-
-	for i := nWords; i < len(dst); i++ {
-		dst[i] = 0
-	}
-}
-
-func addPacked(dst, x []word) word {
-	carry := dword(0)
-
-	//dst can be longer than x
-	for i := 0; i < len(x); i++ {
-		carry = carry + dword(dst[i]) + dword(x[i])
-		dst[i] = word(carry)
-		carry >>= wordBits
-	}
-
-	return word(carry)
 }
