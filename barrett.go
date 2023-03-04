@@ -172,6 +172,42 @@ func barrettNegate(dst []word, p *barrettPrime) {
 	dst[p.wordsInP-1] = word(carry)
 }
 
+func barrettMac(dst, x, y []word, p *barrettPrime) {
+	nWords := int(p.wordsInP)
+	if nWords < len(x) {
+		nWords = len(x)
+	}
+	nWords++
+
+	if nWords < len(dst) {
+		nWords = len(dst)
+	}
+
+	tmp := make([]word, nWords)
+
+	for bpos := len(y) - 1; bpos >= 0; bpos-- {
+		for idown := nWords - 2; idown >= 0; idown-- {
+			tmp[idown+1] = tmp[idown]
+		}
+
+		tmp[0] = 0
+
+		carry := widemac(tmp, x, y[bpos], 0)
+		barrettReduce(tmp, carry, p)
+	}
+
+	cout := addPacked(tmp, dst)
+	barrettReduce(tmp, cout, p)
+
+	for i := 0; i < nWords && i < len(dst); i++ {
+		dst[i] = tmp[i]
+	}
+
+	for i := nWords; i < len(dst); i++ {
+		dst[i] = 0
+	}
+}
+
 func addPacked(dst, x []word) word {
 	carry := dword(0)
 

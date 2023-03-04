@@ -514,7 +514,7 @@ func (p *twExtendedPoint) toAffine() *affineCoordinates {
 	return out
 }
 
-//TODO: extendedPoint should not know about twNiels
+// TODO: extendedPoint should not know about twNiels
 func (np *twNiels) toExtended() *twExtendedPoint {
 	p := &twExtendedPoint{
 		&bigNumber{},
@@ -851,7 +851,7 @@ func (p *twExtendedPoint) Double() Point {
 
 // Encode returns the encoding of a point (p) as a sequence of bytes.
 // This uses the 'decaf' technique. See `Decaf: Eliminating cofactors through
-// point compression``, Mike Hamburg, Advances in Cryptology (Crypto 2015).
+// point compression“, Mike Hamburg, Advances in Cryptology (Crypto 2015).
 // This technique removes the cofactor through quotients and isogenies.
 // The internal representation of points is as "even" elements of a twisted
 // Edwards curve with a=-1. Using this subgroup removes a factor of 2 from the
@@ -882,8 +882,8 @@ func (p *twExtendedPoint) Decode(src []byte, useIdentity bool) (bool, error) {
 }
 
 // EdDSAEncode returns the encoding of a point (p) as a sequence of bytes.
-// This uses the eddsa techinique. See ``Edwards-Curve Digital Signature
-// Algorithm (EdDSA)``, S. Josefsson and I. Liusvaara, Internet Research Task
+// This uses the eddsa techinique. See “Edwards-Curve Digital Signature
+// Algorithm (EdDSA)“, S. Josefsson and I. Liusvaara, Internet Research Task
 // Force (IRTF).
 // Multiplies the point to the cofactor first.
 func (p *twExtendedPoint) EdDSAEncode() []byte {
@@ -916,13 +916,4 @@ func PrecomputedScalarMul(a Scalar) Point {
 // q * a + r * b.
 func PointDoubleScalarMul(q, r Point, a, b Scalar) Point {
 	return doubleScalarMul(q.(*twExtendedPoint), r.(*twExtendedPoint), a.(*scalar), b.(*scalar))
-}
-
-// PointDoubleScalarMulNonsecret returns the addition of two multiplications:
-// a given point (q) by a given scalar (b) and the base point of the curve by a
-// given scalar (a): q * b + basePoint * a.
-// @warning: This function takes variable time, and may leak the scalars used.
-// It is designed for signature verification.
-func PointDoubleScalarMulNonsecret(q Point, a, b Scalar) Point {
-	return decafDoubleNonSecretScalarMul(q.(*twExtendedPoint), a.(*scalar), b.(*scalar))
 }

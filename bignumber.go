@@ -1,7 +1,5 @@
 package ed448
 
-import "fmt"
-
 type word uint32
 type sword int32
 type dword uint64
@@ -86,7 +84,7 @@ func (n *bigNumber) set(x *bigNumber) *bigNumber {
 	return n
 }
 
-//in is big endian
+// in is big endian
 func (n *bigNumber) setBytes(in []byte) *bigNumber {
 	if len(in) != fieldBytes {
 		return nil
@@ -218,7 +216,7 @@ func (n *bigNumber) addRaw(x *bigNumber, y *bigNumber) *bigNumber {
 	return n
 }
 
-//n = x + y
+// n = x + y
 func (n *bigNumber) add(x *bigNumber, y *bigNumber) *bigNumber {
 	return n.addRaw(x, y).weakReduce()
 }
@@ -249,7 +247,7 @@ func (n *bigNumber) subRaw(x *bigNumber, y *bigNumber) *bigNumber {
 	return n
 }
 
-//n = x - y
+// n = x - y
 func (n *bigNumber) sub(x *bigNumber, y *bigNumber) *bigNumber {
 	return n.subRaw(x, y).bias(2).weakReduce()
 }
@@ -405,19 +403,19 @@ func (n *bigNumber) newMulWUnsigned(x *bigNumber, w word) *bigNumber {
 	return n
 }
 
-//n = x * y
+// n = x * y
 func (n *bigNumber) mulCopy(x *bigNumber, y *bigNumber) *bigNumber {
 	//it does not work in place, that why the temporary bigNumber is necessary
 	return n.set(new(bigNumber).mul(x, y))
 }
 
-//n = x * y
+// n = x * y
 func (n *bigNumber) mul(x *bigNumber, y *bigNumber) *bigNumber {
 	//it does not work in place, that why the temporary bigNumber is necessary
 	return karatsubaMul(n, x, y)
 }
 
-//TODO Security this is not constant time
+// TODO Security this is not constant time
 func (n *bigNumber) mulWSignedCurveConstant(x *bigNumber, c sdword) *bigNumber {
 	if c > 0 {
 		return n.mulW(x, dword(c))
@@ -535,13 +533,7 @@ func (n *bigNumber) decafCondNegate(neg word) {
 	n.decafConstTimeSel(n, new(bigNumber).sub(bigZero, n), neg)
 }
 
-func (n *bigNumber) newCondNegate(neg word) {
-	x := &bigNumber{}
-	x.sub(bigZero, n)
-	n.newConstTimeSel(n, x, word(64), neg, word(0))
-}
-
-//if swap == 0xffffffff => n = x, x = n
+// if swap == 0xffffffff => n = x, x = n
 // This is constant time
 func (n *bigNumber) conditionalSwap(x *bigNumber, swap word) *bigNumber {
 	for i, xv := range x {
@@ -885,15 +877,4 @@ func dsaLikeDeserialize(n *bigNumber, in []byte, mask uint) word {
 	}
 
 	return isZeroMask(word(buffer)) & ^(isZeroMask(word(scarry)))
-}
-
-func (n *bigNumber) String() string {
-	dst := make([]byte, fieldBytes)
-	serialize(dst[:], n)
-	return fmt.Sprintf("%#v", dst)
-	//return fmt.Sprintf("0x%s", new(big.Int).SetBytes(rev(dst)).Text(16))
-}
-
-func (n *bigNumber) limbs() []word {
-	return n[:]
 }
