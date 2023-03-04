@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build darwin,arm,!go1.12
+// +build !amd64 gccgo appengine purego
 
-package unix
+package curve25519
 
-func Getdirentries(fd int, buf []byte, basep *uintptr) (n int, err error) {
-	return 0, ENOSYS
+func scalarMult(out, in, base *[32]byte) {
+	scalarMultGeneric(out, in, base)
 }
