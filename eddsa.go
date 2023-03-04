@@ -10,19 +10,6 @@ func clamp(val []byte) {
 	val[57-2] |= 0x80
 }
 
-func deriveKeypair(sym [57]byte) (Scalar, Point) {
-	digest := [57]byte{}
-	sha3.ShakeSum256(digest[:], sym[:])
-	clamp(digest[:])
-
-	r := NewScalar(digest[:])
-	r.Halve(r)
-	r.Halve(r)
-	h := PrecomputedScalarMul(r)
-
-	return r, h
-}
-
 func hashWithDom(output []byte, input []byte) {
 	sha3.ShakeSum256(output, append(append([]byte("SigEd448"), 0x00, 0x00), input...))
 }

@@ -1,7 +1,5 @@
 package ed448
 
-import "fmt"
-
 type combTables []*twNiels
 type adjustmentsTable [2 * scalarWords]word
 
@@ -457,10 +455,4 @@ func init() {
 
 	baseTable.combs = t[:]
 	baseTable.adjustments = adj
-}
-
-func debugBaseTable() {
-	for i, ni := range baseTable.combs {
-		fmt.Printf("table[%d] %s\n", i, ni)
-	}
 }

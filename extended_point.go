@@ -113,43 +113,6 @@ func (p *twExtendedPoint) sub(q *twExtendedPoint, r *twExtendedPoint) {
 	p.t.mul(b, c)
 }
 
-//func (p *twExtendedPoint) newSub(q *twExtendedPoint, r *twExtendedPoint) {
-//	a, b, c, d := &bigNumber{}, &bigNumber{}, &bigNumber{}, &bigNumber{}
-//	b.sub(q.y, q.x)
-//	d.sub(r.y, r.x)
-//	c.addRaw(r.y, r.x)
-//	a.mul(c, b)
-//	b.addRaw(q.y, q.x)
-//	p.y.mul(d, b)
-//	b.mul(r.t, q.t)
-//	p.x.newMulw(b, word(0x13154))
-//	b.addRaw(a, p.y)
-//	c.sub(p.y, a)
-//	a.mul(q.z, r.z)
-//	a.addRaw(a, a)
-//	a.weakReduce()
-//	p.y.sub(a, p.x)
-//	a.addRaw(a, p.x)
-//	p.z.mul(a, p.y)
-//	p.x.mul(p.y, c)
-//	p.y.mul(a, b)
-//	p.t.mul(b, c)
-//}
-
-func (p *twExtendedPoint) negate(q *twExtendedPoint) {
-	p.x.sub(bigZero, q.x)
-	p.y = q.y.copy()
-	p.z = q.z.copy()
-	p.t.sub(bigZero, q.t)
-}
-
-func (p *twExtendedPoint) torque(q *twExtendedPoint) {
-	p.x.sub(bigZero, q.x)
-	p.y.sub(bigZero, q.y)
-	p.z = q.z.copy()
-	p.t = q.t.copy()
-}
-
 // Based on Hisil's formula 5.1.3: Doubling in E^e
 func (p *twExtendedPoint) doubleInternal(beforeDouble bool) *twExtendedPoint {
 	a, b, c, d := &bigNumber{}, &bigNumber{}, &bigNumber{}, &bigNumber{}
@@ -211,43 +174,6 @@ func (p *twExtendedPoint) deisogenize(t, overT word) *bigNumber {
 	return s
 }
 
-func (p *twExtendedPoint) deisogenizeNew(invElSum, invElM1 *bigNumber, toggleS, toggleAltX word) *bigNumber {
-	t1, s := &bigNumber{}, &bigNumber{}
-
-	t2 := s.copy()
-	t3 := invElSum
-	t4 := invElM1
-
-	t1.add(p.x, p.t)
-	t2.sub(p.x, p.t)
-	t3.mul(t1, t2) // t3 = num
-	t2.square(p.x)
-	t1.mul(t2, t3)
-	t2.newMulw(t1, word(0x98a9)) // -x^2 * (a-d) * num
-	t1.isr(t2)                   // t1 = isr
-	t2.mul(t1, t3)               // t2 = ratio
-	t4.mul(t2, factor)
-	negX := lowBit(t4) ^ toggleAltX
-	t2.decafCondNegate(negX)
-	t3.mul(t2, p.z)
-	t3.sub(t3, p.t)
-	t2.mul(t3, p.x)
-	t4.newMulw(t2, word(0x98a9))
-	s.mul(t4, t1)
-
-	lobs := lowBit(s)
-	s.decafCondNegate(lobs)
-
-	tmp := &bigNumber{}
-	tmp = p.x.copy()
-	tmp.decafCondNegate((^lobs) ^ negX ^ toggleS)
-	tmp.add(tmp, p.t)
-
-	*invElM1 = *tmp
-
-	return s
-}
-
 // TODO: should this return a bool and an error?
 func decafDecodeOld(dst *twExtendedPoint, src serialized, useIdentity bool) (word, error) {
 	a, b, c, d, e := &bigNumber{}, &bigNumber{}, &bigNumber{}, &bigNumber{}, &bigNumber{}
@@ -286,51 +212,6 @@ func decafDecodeOld(dst *twExtendedPoint, src serialized, useIdentity bool) (wor
 		err = errors.New("unable to decode given point")
 		return succ, err
 	}
-	return succ, err
-}
-
-func decafDecode(dst *twExtendedPoint, src serialized, useIdentity bool) (word, error) {
-	s2, num, tmp, tmp2 := &bigNumber{}, &bigNumber{}, &bigNumber{}, &bigNumber{}
-
-	isr := dst.x
-	den := dst.t
-	ynum := dst.z
-
-	s, succ := deserializeReturnMask(src)
-	zero := s.decafEq(bigZero)
-	if useIdentity {
-		succ &= decafTrue | ^zero
-	} else {
-		succ &= decafFalse | ^zero
-	}
-	succ &= ^lowBit(s)
-
-	s2.square(s)
-	den.sub(bigOne, s2)
-	ynum.add(bigOne, s2)
-	num.mulWSignedCurveConstant(s2, -4*(edwardsD-1))
-	tmp.square(den)
-	num.add(tmp, num)
-	tmp2.mul(num, tmp)
-	succ &= isr.isr(tmp2)
-	tmp.mul(isr, den)
-	dst.y.mul(tmp, ynum)
-	tmp2.mul(tmp, s)
-	tmp2.add(tmp2, tmp2)
-	tmp.mul(tmp2, isr)
-	dst.x.mul(tmp, num)
-	tmp.mul(tmp2, factor)
-
-	dst.x.decafCondNegate(lowBit(tmp))
-	dst.z.set(bigOne)
-	dst.t.mul(dst.x, dst.y)
-
-	var err error
-	if succ != decafTrue {
-		err = errors.New("unable to decode given point")
-		return succ, err
-	}
-
 	return succ, err
 }
 
@@ -420,7 +301,6 @@ func edDSALikeDecode(p *twExtendedPoint, srcOrg []byte) word {
 	b.set(bigZero)
 	c.set(bigZero)
 	d.set(bigZero)
-	src = make([]byte, 57)
 
 	ok := p.isOnCurve()
 	if !ok {
@@ -488,32 +368,6 @@ func (p *twExtendedPoint) subProjectiveNielsFromExtendedPoint(p2 *twPNiels, befo
 	p.subNielsFromExtendedPoint(p2.n, beforeDouble)
 }
 
-// Convert from the extended twisted Edwards representation of a point to affine
-// Given (X : Y : Z : T), compute X/Z^2, Y/Z^3 and ignore T.
-// If the point is ∞ it returns 0, 0.
-// TODO: check me
-func (p *twExtendedPoint) toAffine() *affineCoordinates {
-	out := &affineCoordinates{
-		&bigNumber{},
-		&bigNumber{},
-	}
-
-	if p.equals(identity) == decafTrue || p.z.decafEq(bigZero) == decafTrue {
-		return out
-	}
-
-	s, t := &bigNumber{}, &bigNumber{}
-
-	r := invert(p.z)
-	s.square(r)
-
-	out.x.mul(p.x, s).strongReduce()
-	t.mul(p.y, s)
-	out.y.mul(t, r).strongReduce()
-
-	return out
-}
-
 // TODO: extendedPoint should not know about twNiels
 func (np *twNiels) toExtended() *twExtendedPoint {
 	p := &twExtendedPoint{
@@ -547,17 +401,6 @@ func (p *twExtendedPoint) toPNiels() *twPNiels {
 		&twNiels{a, b, c},
 		z,
 	}
-}
-
-func (p *twExtendedPoint) isogenizeToMontgomery() []byte {
-	var out [56]byte
-
-	p.t = invert(p.x) // 1/x
-	p.z.mul(p.t, p.y) // y/x
-	p.y.square(p.z)   // (y/x)^2
-
-	dsaLikeSerialize(out[:], p.y)
-	return out[:]
 }
 
 func pointScalarMul(p *twExtendedPoint, s *scalar) *twExtendedPoint {
@@ -650,122 +493,6 @@ func precomputedScalarMul(s *scalar) *twExtendedPoint {
 	}
 
 	return p
-}
-
-// using the montgomery ladder
-// TODO: implement the one not using montgomery?
-func directPointScalarMul(p [fieldBytes]byte, s *scalar, useIdentity word) ([fieldBytes]byte, word) {
-	var out [56]byte
-	xa, xs, zs, l0, l1 := &bigNumber{}, &bigNumber{}, &bigNumber{}, &bigNumber{}, &bigNumber{}
-
-	s0, succ := deserializeReturnMask(p)
-	succ &= useIdentity | ^(s0.decafEq(bigZero))
-
-	// Prepare the Montgomery ladder: Q = 1:0, P+Q = P
-	xa.square(s0)
-	x0 := xa.copy()
-	za := bigOne.copy()
-	xd := bigOne.copy()
-	zd := bigZero.copy()
-
-	pflip := word(0x00)
-	for i := scalarBits - 1; i >= 0; i-- {
-		// Augmented Montgomery ladder
-		flip := -(s[i/wordBits] >> word(i%wordBits) & 1)
-		// Differential add
-		xs.addRaw(xa, za)
-		zs.sub(xa, za)
-		xa.addRaw(xd, zd)
-		za.sub(xd, zd)
-
-		l0.decafConstTimeSel(xa, xs, flip^pflip)
-		l1.decafConstTimeSel(za, zs, flip^pflip)
-
-		xd.mul(xa, zs)
-		zd.mul(xs, za)
-		xs.addRaw(xd, zd)
-		zd.sub(xd, zd)
-		zs.mul(zd, s0)
-		xa.square(xs)
-		za.square(zs)
-
-		// double
-		zd.square(l0)
-		l0.square(l1)
-		l1.sub(zd, l0)
-		xd.mul(l0, zd)
-		zd.mulWSignedCurveConstant(l1, 1-(edwardsD))
-		l0.addRaw(l0, zd)
-		zd.mul(l0, l1)
-
-		pflip = flip
-	}
-	xa.conditionalSwap(xd, pflip)
-	za.conditionalSwap(zd, pflip)
-
-	// TODO: should be constant time
-	// reserialize TODO: simplify this reserialization
-	xzD, xzA, xzS, den, l2, l3 := &bigNumber{}, &bigNumber{}, &bigNumber{}, &bigNumber{}, &bigNumber{}, &bigNumber{}
-
-	xzS.mul(xs, zs)
-	xzD.mul(xd, zd)
-	xzA.mul(xa, za)
-	zeroOut := xzD.decafEq(bigZero)
-	xzD[0] -= zeroOut // make xzD always nonzero
-	zCase := zeroOut | xzA.decafEq(bigZero)
-	zeroZA := za.decafEq(bigZero)
-
-	// Curve test in zcase, compute x0^2 + (2d-4)x0 + 1
-	l0.add(x0, bigOne)
-	l1.square(l0)
-	l0.mulWSignedCurveConstant(x0, -4*edwardsD)
-	l1.add(l1, l0)
-	xzA.decafConstTimeSel(xzA, l1, zCase)
-
-	// Compute denominator = x0 xa za xd zd
-	l0.mul(x0, xzA)
-	l1.mul(l0, xzD)
-	den.isr(l1)
-
-	// Check that the square root is valid.
-	l2.square(den)
-	l3.mul(l0, l2) // x0 xa za den^2 = 1/xzD
-	l0.mul(l1, l2)
-	l0.add(l0, bigOne)
-	succ &= ^highBit(s0) & ^(l0.decafEq(bigZero))
-
-	// Compute y/x for input and output point.
-	l1.mul(x0, xd)
-	l1.sub(zd, l1)
-	l0.mul(za, l1) // L0 = "opq"
-	l1.mul(x0, zd)
-	l1.sub(l1, xd)
-	l2.mul(xa, l1) // L2 = "pqr"
-	l1.sub(l0, l2)
-	l0.add(l0, l2)
-	l2.mul(l1, den) // L2 = y0 / x0
-	l1.mul(l0, den) // L1 = yO / xO
-	sflip := lowBit(l1) ^ lowBit(l2) | zeroZA
-
-	// If xa==0 or za ==0: return 0
-	// Else if za == 0: return s0 * (sflip ? zd : xd)^2 * L3
-	// Else if zd == 0: return s0 * (sflip ? zd : xd)^2 * L3
-	// Else if pflip: return xs * zs * (sflip ? zd : xd) * L3
-	// Else: return s0 * xs * zs * (sflip ? zd : xd) * den
-	xd.decafConstTimeSel(xd, zd, sflip)
-	den.decafConstTimeSel(den, l3, pflip|zCase)
-	xzS.decafConstTimeSel(xzS, xd, zCase)
-	s0.decafConstTimeSel(s0, bigOne, pflip & ^zCase)
-	s0.decafConstTimeSel(s0, bigZero, zeroOut)
-
-	l0.mul(xd, den)
-	l1.mul(l0, s0)
-	l0.mul(l1, xzS)
-
-	l0.conditionalNegate(highBit(l0))
-	serialize(out[:], l0)
-
-	return out, succ
 }
 
 // exposed methods

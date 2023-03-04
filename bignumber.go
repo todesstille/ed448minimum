@@ -14,10 +14,6 @@ func isZeroMask(n word) word {
 	return word(nn >> wordBits)
 }
 
-func (n *bigNumber) isZero() (eq bool) {
-	return n.zeroMask() == lmask
-}
-
 func (n *bigNumber) copy() *bigNumber {
 	c := &bigNumber{}
 	copy(c[:], n[:])
@@ -84,29 +80,6 @@ func (n *bigNumber) set(x *bigNumber) *bigNumber {
 	return n
 }
 
-// in is big endian
-func (n *bigNumber) setBytes(in []byte) *bigNumber {
-	if len(in) != fieldBytes {
-		return nil
-	}
-
-	s := serialized{}
-	for i, si := range in {
-		s[len(s)-i-1] = si
-	}
-
-	d, ok := deserialize(s)
-	if !ok {
-		return nil
-	}
-
-	for i, di := range d {
-		n[i] = di
-	}
-
-	return n
-}
-
 func (n *bigNumber) setUI(y dword) *bigNumber {
 	n[0] = word(y) & radixMask
 	n[1] = word(y >> radix)
@@ -126,30 +99,6 @@ func (n *bigNumber) setUI(y dword) *bigNumber {
 	n[15] = 0
 
 	return n
-}
-
-func (n *bigNumber) zeroMask() word {
-	x := n.copy().strongReduce()
-	r := word(0)
-
-	r |= x[0]
-	r |= x[1]
-	r |= x[2]
-	r |= x[3]
-	r |= x[4]
-	r |= x[5]
-	r |= x[6]
-	r |= x[7]
-	r |= x[8]
-	r |= x[9]
-	r |= x[10]
-	r |= x[11]
-	r |= x[12]
-	r |= x[13]
-	r |= x[14]
-	r |= x[15]
-
-	return isZeroMask(word(r))
 }
 
 // Return high bit of x = low bit of 2x mod p
@@ -221,11 +170,6 @@ func (n *bigNumber) add(x *bigNumber, y *bigNumber) *bigNumber {
 	return n.addRaw(x, y).weakReduce()
 }
 
-func (n *bigNumber) addW(w word) *bigNumber {
-	n[0] += word(w)
-	return n
-}
-
 func (n *bigNumber) subRaw(x *bigNumber, y *bigNumber) *bigNumber {
 	n[0] = x[0] - y[0]
 	n[1] = x[1] - y[1]
@@ -250,11 +194,6 @@ func (n *bigNumber) subRaw(x *bigNumber, y *bigNumber) *bigNumber {
 // n = x - y
 func (n *bigNumber) sub(x *bigNumber, y *bigNumber) *bigNumber {
 	return n.subRaw(x, y).bias(2).weakReduce()
-}
-
-func (n *bigNumber) subW(w word) *bigNumber {
-	n[0] -= word(w)
-	return n
 }
 
 func (n *bigNumber) subXBias(x *bigNumber, y *bigNumber, amt word) *bigNumber {
@@ -374,41 +313,6 @@ func (n *bigNumber) mulW(x *bigNumber, w dword) *bigNumber {
 	return n
 }
 
-func wideMul(a, b word) dword {
-	return dword(a) * dword(b)
-}
-
-func (n *bigNumber) newMulWUnsigned(x *bigNumber, w word) *bigNumber {
-	var accum0, accum8 dword
-	mask := word(1<<28) - 1
-
-	for i := 0; i < 8; i++ {
-		accum0 += wideMul(w, x[i])
-		accum8 += wideMul(w, x[i+8])
-
-		n[i] = word(accum0) & mask
-		accum0 >>= 28
-		n[i+8] = word(accum8) & mask
-		accum8 >>= 28
-	}
-
-	accum0 += accum8 + dword(n[8])
-	n[8] = word(accum0) & mask
-	n[9] += word(accum0 >> 28)
-
-	accum8 += dword(n[0])
-	n[0] = word(accum8) & mask
-	n[1] += word(accum8 >> 28)
-
-	return n
-}
-
-// n = x * y
-func (n *bigNumber) mulCopy(x *bigNumber, y *bigNumber) *bigNumber {
-	//it does not work in place, that why the temporary bigNumber is necessary
-	return n.set(new(bigNumber).mul(x, y))
-}
-
 // n = x * y
 func (n *bigNumber) mul(x *bigNumber, y *bigNumber) *bigNumber {
 	//it does not work in place, that why the temporary bigNumber is necessary
@@ -422,15 +326,6 @@ func (n *bigNumber) mulWSignedCurveConstant(x *bigNumber, c sdword) *bigNumber {
 	}
 
 	r := n.mulW(x, dword(-c))
-	return r.sub(bigZero, r)
-}
-
-func (n *bigNumber) newMulw(x *bigNumber, w word) *bigNumber {
-	if w > 0 {
-		return n.newMulWUnsigned(x, w)
-	}
-
-	r := n.newMulWUnsigned(x, -w)
 	return r.sub(bigZero, r)
 }
 

@@ -1,26 +1,5 @@
 package ed448
 
-// y^2/x^2
-// needed: 4*v*(u^2 - 1)/(u^4 - 2*u^2 + 4*v^2 + 1)
-func (p *twExtendedPoint) x448LikeEncode(dst []byte) {
-	if len(dst) != x448FieldBytes {
-		panic("Attempted to encode with a destination that is not 56 bytes")
-	}
-
-	q := p.copy()
-	q.t = invert(p.x) // 1/x
-	q.z.mul(q.t, q.y) // y/x
-	q.y.square(q.z)   // (y/x)^2
-
-	dsaLikeSerialize(dst[:], q.y)
-
-	// wipe out
-	q.x.set(bigZero)
-	q.y.set(bigZero)
-	q.z.set(bigZero)
-	q.t.set(bigZero)
-}
-
 func fromEdDSATox448(ed []byte) [x448FieldBytes]byte {
 	if len(ed) != dsaFieldBytes {
 		panic("Attempted to convert an array that is not 57 bytes")
@@ -49,40 +28,6 @@ func fromEdDSATox448(ed []byte) [x448FieldBytes]byte {
 	d.set(bigZero)
 
 	return dst
-}
-
-func x448BasePointScalarMul(s []byte) [x448FieldBytes]byte {
-	if len(s) != x448FieldBytes {
-		panic("Wrong scalar length: should be 56 bytes")
-	}
-
-	scalar2 := append([]byte{}, s...)
-	// Scalar conditioning
-	scalar2[0] &= -(byte(Cofactor))
-
-	theScalar := &scalar{}
-
-	scalar2[x448FieldBytes-1] &= ^(-1 << ((x448FieldBytes + 7) % 8))
-	scalar2[x448FieldBytes-1] |= 1 << ((x448FieldBytes + 7) % 8)
-
-	theScalar.decode(scalar2)
-
-	for i := uint(1); i < 2; i <<= 1 {
-		theScalar.halve(theScalar)
-	}
-
-	p := precomputedScalarMul(theScalar)
-
-	var out [x448FieldBytes]byte
-	p.x448LikeEncode(out[:])
-
-	// wipe out
-	p.y.set(bigZero)
-	p.x.set(bigZero)
-	p.z.set(bigZero)
-	p.t.set(bigZero)
-
-	return out
 }
 
 func x448ScalarMul(point []byte, s []byte) ([x448FieldBytes]byte, bool) {

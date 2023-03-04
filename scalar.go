@@ -145,10 +145,6 @@ func (s *scalar) copy() *scalar {
 	return out
 }
 
-func (s *scalar) set(w word) {
-	s[0] = w
-}
-
 // {minuend , accum} - subtrahend + (one or mor) q
 // Must have carry <= 1
 func (s *scalar) subExtra(minuend *scalar, subtrahend *scalar, carry word) {
@@ -181,11 +177,6 @@ func (s *scalar) add(a, b *scalar) {
 		chain >>= wordBits
 	}
 	s.subExtra(s, ScalarQ, word(chain))
-}
-
-func (s *scalar) sub(x, y *scalar) {
-	noExtra := word(0x00)
-	s.subExtra(x, y, noExtra)
 }
 
 func (s *scalar) mul(x, y *scalar) {
