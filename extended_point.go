@@ -911,9 +911,11 @@ func PrecomputedScalarMul(a Scalar) Point {
 	return precomputedScalarMul(a.(*scalar))
 }
 
-// PointDoubleScalarMul returns the addition of two multiplications: a given
-// point (q) by a given scalar (a) and a given point (r) by a given scalar (b):
-// q * a + r * b.
-func PointDoubleScalarMul(q, r Point, a, b Scalar) Point {
-	return doubleScalarMul(q.(*twExtendedPoint), r.(*twExtendedPoint), a.(*scalar), b.(*scalar))
+// PointDoubleScalarMulNonsecret returns the addition of two multiplications:
+// a given point (q) by a given scalar (b) and the base point of the curve by a
+// given scalar (a): q * b + basePoint * a.
+// @warning: This function takes variable time, and may leak the scalars used.
+// It is designed for signature verification.
+func PointDoubleScalarMulNonsecret(q Point, a, b Scalar) Point {
+	return decafDoubleNonSecretScalarMul(q.(*twExtendedPoint), a.(*scalar), b.(*scalar))
 }

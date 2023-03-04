@@ -569,28 +569,6 @@ func (n *bigNumber) decafConstTimeSel(x, y *bigNumber, neg word) {
 	n[15] = (x[15] & (^neg)) | (y[15] & (neg))
 }
 
-func (n *bigNumber) newConstTimeSel(x, y *bigNumber, elementBytes, mask, aligmentBytes word) {
-	var k word
-
-	aligmentBytes |= elementBytes
-
-	for k = 0; k < elementBytes-wordBits; k += wordBits {
-		n[k] = (mask & x[k]) | (^mask & y[k])
-	}
-
-	if elementBytes%wordBits >= word(4) {
-		for ; k <= elementBytes-4; k += 4 {
-			n[k] = (mask & x[k]) | (^mask & y[k])
-		}
-	}
-
-	if (elementBytes % 4) != word(0) {
-		for ; k < elementBytes; k++ {
-			n[k] = (mask & x[k]) | (^mask & y[k])
-		}
-	}
-}
-
 func constantTimeGreaterOrEqualP(n *bigNumber) word {
 	ge := word(lmask)
 

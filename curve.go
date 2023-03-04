@@ -141,8 +141,8 @@ func bytesToWords(dst []word, src []byte) {
 	}
 }
 
-//See Goldilocks spec, "Public and private keys" section.
-//This is equivalent to PRF(k)
+// See Goldilocks spec, "Public and private keys" section.
+// This is equivalent to PRF(k)
 func pseudoRandomFunction(k [symKeyBytes]byte) []byte {
 	h := sha512.New()
 	h.Write([]byte("derivepk"))
@@ -180,7 +180,7 @@ func (c *curveT) generateKey(read io.Reader) (k privateKey, err error) {
 	return c.derivePrivateKey(symKey)
 }
 
-//TODO Is private only the secret part of the privateKey?
+// TODO Is private only the secret part of the privateKey?
 func (c *curveT) computeSecret(private, public []byte) []byte {
 	var sk scalar
 	var pub serialized
@@ -241,7 +241,7 @@ func (c *curveT) deriveTemporarySignature(nonce scalar) (dst [fieldBytes]byte) {
 	return
 }
 
-//TODO Should pubKey have a fixed size here?
+// TODO Should pubKey have a fixed size here?
 func deriveChallenge(pubKey []byte, tmpSignature [fieldBytes]byte, msg []byte) *scalar {
 	h := sha512.New()
 	h.Write(pubKey)
@@ -266,43 +266,4 @@ func deriveNonce(msg []byte, symKey []byte) (dst scalar) {
 
 	//TODO SECURITY should we wipe r?
 	return
-}
-
-func (c *curveT) verify(signature [signatureBytes]byte, msg []byte, k *publicKey) bool {
-	serPubkey := serialized(*k)
-	pk, ok := deserialize(serPubkey)
-	if !ok {
-		return false
-	}
-
-	nonce := &scalar{}
-	ok = barrettDeserialize(nonce[:], signature[fieldBytes:2*fieldBytes], &curvePrimeOrder)
-	if !ok {
-		return false
-	}
-
-	tmpSig := [fieldBytes]byte{}
-	copy(tmpSig[:], signature[:])
-	challenge := deriveChallenge(serPubkey[:], tmpSig, msg)
-
-	eph, ok := deserialize(tmpSig)
-	if !ok {
-		return false
-	}
-
-	//pubKeyBytes -> pubKeyWireFormat -> (DESERPT & twist) -> PK(X, y)
-	pkPoint, ok := pk.deserializeAndTwistApprox()
-	if !ok {
-		return false
-	}
-
-	//magic
-	//PK_2(X, Y) = PK(X,Y) * ????
-	linearComboVarFixedVt(pkPoint, challenge, nonce, wnfsTable[:])
-
-	//PK_2(X,Y) -> (untwist & double & SERPT) -> 2*pubKeyWireFormat
-	//In the end, this should be = 4 * nonce * G
-	pk = pkPoint.untwistAndDoubleAndSerialize()
-
-	return eph.equals(pk)
 }

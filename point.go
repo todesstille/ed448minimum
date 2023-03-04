@@ -1,116 +1,12 @@
 package ed448
 
 import (
-	"errors"
 	"fmt"
 )
 
 type affineCoordinates struct {
 	x, y *bigNumber
 }
-
-func newPoint(x, y []byte) (p *homogeneousProjective, err error) {
-	tmp1, tmp2 := [fieldBytes]byte{}, [fieldBytes]byte{}
-	copy(tmp1[:], x[:])
-	copy(tmp2[:], y[:])
-
-	xN, ok1 := deserialize(tmp1)
-	yN, ok2 := deserialize(tmp2)
-	q := &affineCoordinates{
-		x: xN,
-		y: yN,
-	}
-
-	p = newHomogeneousProjective(q)
-
-	if !(ok1 && ok2) {
-		err = errors.New("invalid coordinates")
-	}
-
-	return
-}
-
-type extensibleCoordinates struct {
-	x, y, z, t, u *bigNumber
-}
-
-//Affine(x,y) => extensible(X, Y, Z, T, U)
-func newExtensible(px, py *bigNumber) *extensibleCoordinates {
-	x := px.copy()
-	y := py.copy()
-	z := &bigNumber{1}
-	t := x.copy()
-	u := y.copy()
-
-	return &extensibleCoordinates{
-		x: x,
-		y: y,
-		z: z,
-		t: t,
-		u: u,
-	}
-}
-
-func (p *extensibleCoordinates) OnCurve() bool {
-	x := p.x
-	y := p.y
-	z := p.z
-	t := p.t
-	u := p.u
-
-	l0 := new(bigNumber)
-	l1 := new(bigNumber)
-	l2 := new(bigNumber)
-	l3 := new(bigNumber)
-
-	// Check invariant:
-	// 0 = d*t^2*u^2 - x^2 - y^2 + z^2
-	l2 = l2.square(y)
-	l1 = l1.neg(l2)
-	l0 = l0.square(z)
-	l2 = l2.add(l0, l1)
-	l3 = l3.square(u)
-	l0 = l0.square(t)
-	l1 = l1.mul(l0, l3)
-	l0 = l0.mulWSignedCurveConstant(l1, edwardsD)
-	l1 = l1.add(l0, l2)
-	l0 = l0.square(x)
-	l2 = l2.neg(l0)
-	l0 = l0.add(l2, l1)
-	l5 := l0.zeroMask()
-
-	// Check invariant:
-	// 0 = -x*y + z*t*u
-	l1 = l1.mul(t, u)
-	l2 = l2.mul(z, l1)
-	l0 = l0.mul(x, y)
-	l1 = l1.neg(l0)
-	l0 = l0.add(l1, l2)
-
-	l4 := l0.zeroMask()
-
-	ret := l4 & l5 & (^z.zeroMask())
-	return ret == decafTrue
-}
-
-func (p *extensibleCoordinates) equals(q *extensibleCoordinates) bool {
-	l0 := new(bigNumber)
-	l1 := new(bigNumber)
-	l2 := new(bigNumber)
-
-	l2 = l2.mul(q.z, p.x)
-	l1 = l1.mul(p.z, q.x)
-	l0 = l0.sub(l2, l1)
-	l4 := l0.zeroMask()
-
-	l2 = l2.mul(q.z, p.y)
-	l1 = l1.mul(p.z, q.y)
-	l0 = l0.sub(l2, l1)
-	l3 := l0.zeroMask()
-
-	return l4&l3 == decafTrue
-}
-
 type twPNiels struct {
 	n *twNiels
 	z *bigNumber
@@ -451,14 +347,14 @@ func (p *twExtensible) untwistAndDoubleAndSerialize() *bigNumber {
 	return b.mul(l1, l3)
 }
 
-//HP(X : Y : Z) = Affine(X/Z, Y/Z), Z ≠ 0
-//TODO This can be replaced by extensible for simplicity if we neither use ADD
-//on the basePoint in test and benchmark (it is not used elsewhere)
+// HP(X : Y : Z) = Affine(X/Z, Y/Z), Z ≠ 0
+// TODO This can be replaced by extensible for simplicity if we neither use ADD
+// on the basePoint in test and benchmark (it is not used elsewhere)
 type homogeneousProjective struct {
 	x, y, z *bigNumber
 }
 
-//Affine to Homogeneous Projective
+// Affine to Homogeneous Projective
 func newHomogeneousProjective(p *affineCoordinates) *homogeneousProjective {
 	return &homogeneousProjective{
 		x: p.x.copy(),
@@ -506,7 +402,7 @@ func rev(in []byte) []byte {
 }
 
 // See Hisil, formula 5.1
-//TODO Used only for testing
+// TODO Used only for testing
 func (p *homogeneousProjective) double() *homogeneousProjective {
 	x1 := p.x
 	y1 := p.y
@@ -577,60 +473,4 @@ func (p *homogeneousProjective) add(p2 *homogeneousProjective) *homogeneousProje
 	return &homogeneousProjective{
 		x3, y3, z3,
 	}
-}
-
-//TODO Move: bigNumber should not know about points
-func (sz *bigNumber) deserializeAndTwistApprox() (*twExtensible, bool) {
-	a := &twExtensible{
-		x: new(bigNumber),
-		y: new(bigNumber),
-		z: new(bigNumber),
-		u: new(bigNumber),
-		t: new(bigNumber),
-	}
-
-	var L0, L1 *bigNumber
-	L0 = new(bigNumber)
-	L1 = new(bigNumber)
-	a.z.square(sz)
-	a.y = a.z.copy()
-	a.y.addW(1)
-	L0.square(a.y)
-	a.x.mulWSignedCurveConstant(L0, edwardsD-1)
-	a.y.add(a.z, a.z)
-	a.u.add(a.y, a.y)
-	a.y.add(a.u, a.x)
-	a.x.square(a.z)
-	a.u.neg(a.x)
-	a.u.addW(1)
-	a.x.mul(sqrtDminus1, a.u)
-	L0.mul(a.x, a.y)
-	a.t.mul(L0, a.y)
-	a.u.mul(a.x, a.t)
-	a.t.mul(a.u, L0)
-	a.y.mul(a.x, a.t)
-	L0.isr(a.y)
-	a.y.mul(a.u, L0)
-	L1.square(L0)
-	a.u.mul(a.t, L1)
-	a.t.mul(a.x, a.u)
-	a.x.add(sz, sz)
-	L0.mul(a.u, a.x)
-	a.x = a.z.copy()
-	L1.neg(a.x)
-	L1.addW(1)
-	a.x.mul(L1, L0)
-	L0.mul(a.u, a.y)
-	a.z.addW(1)
-	a.y.mul(a.z, L0)
-	a.t.subW(1)
-
-	// TODO maybe related with constant time
-	ret := a.t.isZero()
-
-	a.z.setUI(1)
-	a.t = a.x.copy()
-	a.u = a.y.copy()
-
-	return a, !ret
 }
